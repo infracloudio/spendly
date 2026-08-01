@@ -2,8 +2,57 @@
 
 {% block title %}Terms and Conditions - Spendly{% endblock %}
 
+{% block head %}
+<style>
+    .terms-container {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 4rem 2rem;
+    }
+
+    .terms-container h1 {
+        font-family: var(--font-display);
+        font-size: clamp(2rem, 4vw, 3rem);
+        color: var(--ink);
+        margin-bottom: 3rem;
+        line-height: 1.2;
+    }
+
+    .terms-section {
+        margin-bottom: 2.5rem;
+    }
+
+    .terms-section h2 {
+        font-family: var(--font-display);
+        font-size: 1.4rem;
+        color: var(--ink);
+        margin-bottom: 1rem;
+        line-height: 1.3;
+    }
+
+    .terms-section p {
+        font-size: 0.95rem;
+        color: var(--ink-soft);
+        line-height: 1.8;
+        margin-bottom: 0.75rem;
+    }
+
+    .terms-section ul {
+        margin-left: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .terms-section li {
+        font-size: 0.95rem;
+        color: var(--ink-soft);
+        line-height: 1.8;
+        margin-bottom: 0.5rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-container">
+<div class="terms-container">
     <h1>Terms and Conditions</h1>
 
     <section class="terms-section">

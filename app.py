@@ -1,5 +1,7 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, redirect, url_for
 from database.db import get_db, init_db, seed_db
+from werkzeug.security import generate_password_hash
+import sqlite3
 
 app = Flask(__name__)
 
@@ -17,8 +19,48 @@ def landing():
     return render_template("landing.html")
 
 
-@app.route("/register")
+@app.route("/register", methods=["GET", "POST"])
 def register():
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+
+        if not name or not email or not password:
+            return render_template("register.html", error="Name, email, and password are required")
+
+        if "@" not in email:
+            return render_template("register.html", error="Please enter a valid email address")
+
+        parts = email.split("@")
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            return render_template("register.html", error="Please enter a valid email address")
+
+        if len(password) < 8:
+            return render_template("register.html", error="Password must be at least 8 characters")
+
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT COUNT(*) as count FROM users WHERE email = ?", (email,))
+        result = cursor.fetchone()
+
+        if result["count"] > 0:
+            db.close()
+            return render_template("register.html", error="Email is already registered. Please log in or use a different email.")
+
+        try:
+            hashed_password = generate_password_hash(password)
+            cursor.execute(
+                "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
+                (name, email, hashed_password)
+            )
+            db.commit()
+            db.close()
+            return redirect(url_for("login"))
+        except sqlite3.IntegrityError:
+            db.close()
+            return render_template("register.html", error="Email is already registered. Please log in or use a different email.")
+
     return render_template("register.html")
 
 

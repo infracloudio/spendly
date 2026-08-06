@@ -89,3 +89,25 @@ def get_user_by_email(email):
     user = cursor.fetchone()
     db.close()
     return user
+
+
+def aggregate_expenses(transactions):
+    by_category = {}
+    for tx in transactions:
+        cat = tx["category"]
+        if cat not in by_category:
+            by_category[cat] = {"count": 0, "total": 0, "slug": tx["category_slug"]}
+        by_category[cat]["count"] += 1
+        by_category[cat]["total"] += float(tx["amount"])
+
+    max_total = max((c["total"] for c in by_category.values()), default=0)
+    return [
+        {
+            "name": name,
+            "slug": data["slug"],
+            "count": data["count"],
+            "total": f"{data['total']:.2f}",
+            "percentage": int((data["total"] / max_total) * 100) if max_total else 0,
+        }
+        for name, data in sorted(by_category.items())
+    ]

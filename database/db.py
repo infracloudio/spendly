@@ -91,6 +91,36 @@ def get_user_by_email(email):
     return user
 
 
+def get_user_by_id(user_id):
+    """
+    Fetch user record by ID.
+    Returns sqlite3.Row object (dict-like) with keys: id, name, email, created_at
+    Returns None if user not found.
+    """
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT id, name, email, created_at FROM users WHERE id = ?", (user_id,))
+    user = cursor.fetchone()
+    db.close()
+    return user
+
+
+def get_user_expenses(user_id):
+    """
+    Fetch all expenses for a given user, ordered by date descending (newest first).
+    Returns list of sqlite3.Row objects (dict-like).
+    """
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id, amount, category, date, description FROM expenses WHERE user_id = ? ORDER BY date DESC",
+        (user_id,)
+    )
+    expenses = cursor.fetchall()
+    db.close()
+    return expenses if expenses else []
+
+
 def aggregate_expenses(transactions):
     by_category = {}
     for tx in transactions:
@@ -111,3 +141,47 @@ def aggregate_expenses(transactions):
         }
         for name, data in sorted(by_category.items())
     ]
+
+
+def get_expense_summary(user_id):
+    """
+    Get summary of expenses for a user: total spent, count, categories breakdown, top category.
+    Returns dict with keys: total, count, categories, top_category
+    """
+    expenses = get_user_expenses(user_id)
+
+    if not expenses:
+        return {
+            "total": "0.00",
+            "count": 0,
+            "categories": [],
+            "top_category": "No expenses yet"
+        }
+
+    # Transform expenses into format expected by aggregate_expenses
+    transactions = [
+        {
+            "category": expense["category"],
+            "category_slug": expense["category"].lower(),
+            "amount": expense["amount"]
+        }
+        for expense in expenses
+    ]
+
+    # Get categorized breakdown
+    categories = aggregate_expenses(transactions)
+
+    # Calculate totals
+    total_amount = sum(expense["amount"] for expense in expenses)
+
+    # Get top category (highest total spent)
+    top_category = "No expenses yet"
+    if categories:
+        top_category = max(categories, key=lambda x: float(x["total"]))["name"]
+
+    return {
+        "total": f"{total_amount:.2f}",
+        "count": len(expenses),
+        "categories": categories,
+        "top_category": top_category
+    }

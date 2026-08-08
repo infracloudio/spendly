@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, g
-from database.db import get_db, init_db, seed_db, get_user_by_email, aggregate_expenses
+from database.db import get_db, init_db, seed_db, get_user_by_email, get_user_by_id, aggregate_expenses, get_user_expenses, get_expense_summary
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 
@@ -121,32 +121,46 @@ def profile():
     if not session.get("user_id"):
         return redirect(url_for("login"))
 
-    user_name = "Demo User"
-    user_email = "demo@spendly.com"
-    member_since = "August 2026"
+    user_id = session.get("user_id")
 
+    # Fetch real user data from database
+    user = get_user_by_id(user_id)
+    if not user:
+        return redirect(url_for("login"))
+
+    user_name = user["name"]
+    user_email = user["email"]
+    user_initials = "".join(word[0].upper() for word in user_name.split())
+    member_since = user["created_at"]
+
+    # Fetch user expenses and calculate summary stats
+    expenses = get_user_expenses(user_id)
+
+    # Transform expenses into format for transactions display
     transactions_data = [
-        {"date": "2026-08-01", "description": "Coffee and breakfast", "category": "Food", "category_slug": "food", "amount": "12.50"},
-        {"date": "2026-08-02", "description": "Uber to office", "category": "Transport", "category_slug": "transport", "amount": "45.00"},
-        {"date": "2026-08-03", "description": "Internet bill", "category": "Bills", "category_slug": "bills", "amount": "120.00"},
-        {"date": "2026-08-04", "description": "Gym membership", "category": "Health", "category_slug": "health", "amount": "25.00"},
-        {"date": "2026-08-05", "description": "Movie tickets", "category": "Entertainment", "category_slug": "entertainment", "amount": "60.00"},
-        {"date": "2026-08-06", "description": "New shoes", "category": "Shopping", "category_slug": "shopping", "amount": "85.50"},
-        {"date": "2026-08-07", "description": "Lunch", "category": "Food", "category_slug": "food", "amount": "15.00"},
-        {"date": "2026-08-08", "description": "Miscellaneous", "category": "Other", "category_slug": "other", "amount": "30.00"},
+        {
+            "date": expense["date"],
+            "description": expense["description"] or "",
+            "category": expense["category"],
+            "category_slug": expense["category"].lower(),
+            "amount": f"{expense['amount']:.2f}"
+        }
+        for expense in expenses
     ]
 
-    total_spent = sum(float(t["amount"]) for t in transactions_data)
-    transaction_count = len(transactions_data)
-    categories = aggregate_expenses(transactions_data)
-    top_category = max(categories, key=lambda x: float(x["total"]))["name"]
+    # Get summary stats
+    summary = get_expense_summary(user_id)
+    total_spent = summary["total"]
+    transaction_count = summary["count"]
+    top_category = summary["top_category"]
+    categories = summary["categories"]
 
     context = {
         "user_name": user_name,
-        "user_initials": "".join(word[0].upper() for word in user_name.split()),
+        "user_initials": user_initials,
         "user_email": user_email,
         "member_since": member_since,
-        "total_spent": f"{total_spent:.2f}",
+        "total_spent": total_spent,
         "transaction_count": transaction_count,
         "top_category": top_category,
         "transactions": transactions_data,

@@ -1,6 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for, session, g
-from database.db import get_db, init_db, seed_db, get_user_by_email, get_user_by_id, aggregate_expenses, get_user_expenses, get_expense_summary
+from flask import Flask, render_template, request, redirect, url_for, session, g, flash
+from database.db import get_db, init_db, seed_db, get_user_by_email, get_user_by_id, aggregate_expenses, get_user_expenses, get_expense_summary, email_exists, create_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, timedelta
 import sqlite3
 
 app = Flask(__name__)
@@ -9,6 +10,62 @@ app.secret_key = "dev-secret-key-spendly-step3"
 with app.app_context():
     init_db()
     seed_db()
+
+
+# ------------------------------------------------------------------ #
+# Helper functions                                                    #
+# ------------------------------------------------------------------ #
+
+def parse_iso_date(value):
+    """Return normalized value if valid YYYY-MM-DD, else None."""
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        return None
+
+
+def get_preset_dates(preset):
+    """
+    Return dict with 'from' and 'to' keys for a preset, or {'from': None, 'to': None} for 'all_time'.
+    Dates are returned as ISO format strings (YYYY-MM-DD).
+    """
+    today = datetime.now().date()
+
+    if preset == "this_month":
+        return {
+            "from": today.replace(day=1).isoformat(),
+            "to": today.isoformat()
+        }
+    elif preset == "last_3_months":
+        return {
+            "from": (today - timedelta(days=90)).isoformat(),
+            "to": today.isoformat()
+        }
+    elif preset == "last_6_months":
+        return {
+            "from": (today - timedelta(days=180)).isoformat(),
+            "to": today.isoformat()
+        }
+    else:  # "all_time" or absent
+        return {"from": None, "to": None}
+
+
+def determine_active_preset(date_from, date_to):
+    """
+    Return preset name if current dates match a preset, else 'custom'.
+    If no dates are set, return 'all_time'.
+    """
+    if not date_from or not date_to:
+        return "all_time"
+
+    for preset in ("this_month", "last_3_months", "last_6_months"):
+        preset_dates = get_preset_dates(preset)
+        if date_from == preset_dates["from"] and date_to == preset_dates["to"]:
+            return preset
+
+    return "custom"
 
 
 # ------------------------------------------------------------------ #
@@ -43,26 +100,14 @@ def register():
         if len(password) < 8:
             return render_template("register.html", error="Password must be at least 8 characters")
 
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute("SELECT COUNT(*) as count FROM users WHERE email = ?", (email,))
-        result = cursor.fetchone()
-
-        if result["count"] > 0:
-            db.close()
+        if email_exists(email):
             return render_template("register.html", error="Email is already registered. Please log in or use a different email.")
 
         try:
             hashed_password = generate_password_hash(password)
-            cursor.execute(
-                "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
-                (name, email, hashed_password)
-            )
-            db.commit()
-            db.close()
+            create_user(name, email, hashed_password)
             return redirect(url_for("login"))
         except sqlite3.IntegrityError:
-            db.close()
             return render_template("register.html", error="Email is already registered. Please log in or use a different email.")
 
     return render_template("register.html")
@@ -123,6 +168,15 @@ def profile():
 
     user_id = session.get("user_id")
 
+    # Extract and validate date filter parameters
+    date_from = parse_iso_date(request.args.get("date_from"))
+    date_to = parse_iso_date(request.args.get("date_to"))
+
+    if date_from and date_to and date_from > date_to:
+        flash("Start date must be before end date.", "error")
+        date_from = None
+        date_to = None
+
     # Fetch real user data from database
     user = get_user_by_id(user_id)
     if not user:
@@ -133,8 +187,8 @@ def profile():
     user_initials = "".join(word[0].upper() for word in user_name.split())
     member_since = user["created_at"]
 
-    # Fetch user expenses and calculate summary stats
-    expenses = get_user_expenses(user_id)
+    # Fetch user expenses and calculate summary stats (with optional date filtering)
+    expenses = get_user_expenses(user_id, date_from, date_to)
 
     # Transform expenses into format for transactions display
     transactions_data = [
@@ -148,12 +202,20 @@ def profile():
         for expense in expenses
     ]
 
-    # Get summary stats
-    summary = get_expense_summary(user_id)
+    # Get summary stats (with optional date filtering)
+    summary = get_expense_summary(user_id, date_from, date_to)
     total_spent = summary["total"]
     transaction_count = summary["count"]
     top_category = summary["top_category"]
     categories = summary["categories"]
+
+    # Compute preset dates for filter bar (using dict with 'from'/'to' keys)
+    preset_this_month = get_preset_dates("this_month")
+    preset_last_3_months = get_preset_dates("last_3_months")
+    preset_last_6_months = get_preset_dates("last_6_months")
+
+    # Determine which preset (if any) is currently active
+    active_preset = determine_active_preset(date_from, date_to)
 
     context = {
         "user_name": user_name,
@@ -165,6 +227,12 @@ def profile():
         "top_category": top_category,
         "transactions": transactions_data,
         "categories": categories,
+        "date_from": date_from,
+        "date_to": date_to,
+        "active_preset": active_preset,
+        "preset_this_month": preset_this_month,
+        "preset_last_3_months": preset_last_3_months,
+        "preset_last_6_months": preset_last_6_months,
     }
 
     return render_template("profile.html", **context)

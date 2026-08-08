@@ -18,11 +18,40 @@
     </div>
   </div>
 
+  <!-- Date Filter Bar -->
+  <div class="filter-bar">
+    <div class="filter-presets">
+      <a href="{{ url_for('profile') }}"
+         class="preset-btn {% if active_preset == 'all_time' %}preset-btn--active{% endif %}">
+        All Time
+      </a>
+      <a href="{{ url_for('profile', date_from=preset_this_month['from'], date_to=preset_this_month['to']) }}"
+         class="preset-btn {% if active_preset == 'this_month' %}preset-btn--active{% endif %}">
+        This Month
+      </a>
+      <a href="{{ url_for('profile', date_from=preset_last_3_months['from'], date_to=preset_last_3_months['to']) }}"
+         class="preset-btn {% if active_preset == 'last_3_months' %}preset-btn--active{% endif %}">
+        Last 3 Months
+      </a>
+      <a href="{{ url_for('profile', date_from=preset_last_6_months['from'], date_to=preset_last_6_months['to']) }}"
+         class="preset-btn {% if active_preset == 'last_6_months' %}preset-btn--active{% endif %}">
+        Last 6 Months
+      </a>
+    </div>
+
+    <form method="GET" action="{{ url_for('profile') }}" class="filter-form">
+      <input type="date" name="date_from" value="{{ date_from or '' }}" class="filter-input">
+      <span class="filter-separator">to</span>
+      <input type="date" name="date_to" value="{{ date_to or '' }}" class="filter-input">
+      <button type="submit" class="filter-apply">Apply</button>
+    </form>
+  </div>
+
   <!-- Summary Stats -->
   <div class="stats-grid">
     <div class="stat-box">
       <div class="stat-label">Total Spent</div>
-      <div class="stat-value">${{ total_spent }}</div>
+      <div class="stat-value">₹{{ total_spent }}</div>
     </div>
     <div class="stat-box">
       <div class="stat-label">Transactions</div>
@@ -57,7 +86,7 @@
                 {{ transaction.category }}
               </span>
             </td>
-            <td class="amount-cell">${{ transaction.amount }}</td>
+            <td class="amount-cell">₹{{ transaction.amount }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -83,7 +112,7 @@
             ></div>
           </div>
         </div>
-        <div class="breakdown-amount">${{ category.total }}</div>
+        <div class="breakdown-amount">₹{{ category.total }}</div>
       </div>
       {% endfor %}
     </div>

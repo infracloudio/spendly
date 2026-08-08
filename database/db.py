@@ -82,6 +82,40 @@ def seed_db():
     db.close()
 
 
+def email_exists(email):
+    """
+    Check if an email is already registered.
+    Returns True if email exists, False otherwise.
+    """
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT COUNT(*) as count FROM users WHERE email = ?", (email,))
+    result = cursor.fetchone()
+    db.close()
+    return result["count"] > 0
+
+
+def create_user(name, email, password_hash):
+    """
+    Create a new user account.
+    Returns the user dict with id, name, email on success.
+    Raises sqlite3.IntegrityError if email already exists.
+    """
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
+        (name, email, password_hash)
+    )
+    db.commit()
+
+    # Fetch the created user
+    cursor.execute("SELECT id, name, email FROM users WHERE email = ?", (email,))
+    user = cursor.fetchone()
+    db.close()
+    return user
+
+
 def get_user_by_email(email):
     db = get_db()
     cursor = db.cursor()
@@ -105,17 +139,25 @@ def get_user_by_id(user_id):
     return user
 
 
-def get_user_expenses(user_id):
+def get_user_expenses(user_id, date_from=None, date_to=None):
     """
     Fetch all expenses for a given user, ordered by date descending (newest first).
+    Optionally filter by date range (inclusive).
     Returns list of sqlite3.Row objects (dict-like).
     """
     db = get_db()
     cursor = db.cursor()
-    cursor.execute(
-        "SELECT id, amount, category, date, description FROM expenses WHERE user_id = ? ORDER BY date DESC",
-        (user_id,)
-    )
+
+    query = "SELECT id, amount, category, date, description FROM expenses WHERE user_id = ?"
+    params = [user_id]
+
+    if date_from and date_to:
+        query += " AND date BETWEEN ? AND ?"
+        params.extend([date_from, date_to])
+
+    query += " ORDER BY date DESC"
+
+    cursor.execute(query, tuple(params))
     expenses = cursor.fetchall()
     db.close()
     return expenses if expenses else []
@@ -143,12 +185,13 @@ def aggregate_expenses(transactions):
     ]
 
 
-def get_expense_summary(user_id):
+def get_expense_summary(user_id, date_from=None, date_to=None):
     """
     Get summary of expenses for a user: total spent, count, categories breakdown, top category.
+    Optionally filter by date range (inclusive).
     Returns dict with keys: total, count, categories, top_category
     """
-    expenses = get_user_expenses(user_id)
+    expenses = get_user_expenses(user_id, date_from, date_to)
 
     if not expenses:
         return {

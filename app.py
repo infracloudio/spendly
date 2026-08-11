@@ -238,6 +238,13 @@ def profile():
     return render_template("profile.html", **context)
 
 
+@app.route("/analytics")
+def analytics():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+    return render_template("analytics.html")
+
+
 @app.route("/expenses/add")
 def add_expense():
     if not session.get("user_id"):

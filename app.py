@@ -1,8 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, session, g, flash
 from database.db import get_db, init_db, seed_db, get_user_by_email, get_user_by_id, aggregate_expenses, get_user_expenses, get_expense_summary, email_exists, create_user
+from database.queries import insert_expense
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import sqlite3
+import math
 
 app = Flask(__name__)
 app.secret_key = "dev-secret-key-spendly-step3"
@@ -66,6 +68,52 @@ def determine_active_preset(date_from, date_to):
             return preset
 
     return "custom"
+
+
+VALID_CATEGORIES = ["Food", "Transport", "Bills", "Health", "Entertainment", "Shopping", "Other"]
+
+
+def validate_expense_form(amount, category, date_str, description):
+    if not amount:
+        return "Amount is required"
+    if not category:
+        return "Category is required"
+    if not date_str:
+        return "Date is required"
+
+    try:
+        amount_float = float(amount)
+    except ValueError:
+        return "Amount must be a number"
+
+    if not math.isfinite(amount_float) or amount_float <= 0:
+        return "Amount must be greater than 0"
+
+    if category not in VALID_CATEGORIES:
+        return "Please select a valid category"
+
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        return "Date must be in YYYY-MM-DD format"
+
+    if description and len(description) > 200:
+        return "Description must be 200 characters or fewer"
+
+    return None
+
+
+def render_add_expense_form(error=None, amount="", category="", date_str="", description=""):
+    return render_template(
+        "add_expense.html",
+        error=error,
+        amount=amount,
+        category=category,
+        date=date_str,
+        description=description,
+        default_date=datetime.now().date().isoformat(),
+        categories=VALID_CATEGORIES,
+    )
 
 
 # ------------------------------------------------------------------ #
@@ -245,11 +293,44 @@ def analytics():
     return render_template("analytics.html")
 
 
-@app.route("/expenses/add")
+@app.route("/expenses/add", methods=["GET", "POST"])
 def add_expense():
     if not session.get("user_id"):
         return redirect(url_for("login"))
-    return "Add expense — coming in Step 7"
+
+    if request.method == "GET":
+        return render_add_expense_form()
+
+    elif request.method == "POST":
+        user_id = session.get("user_id")
+        amount = request.form.get("amount", "").strip()
+        category = request.form.get("category", "").strip()
+        date_str = request.form.get("date", "").strip()
+        description = request.form.get("description", "").strip()
+
+        error = validate_expense_form(amount, category, date_str, description)
+
+        if error:
+            return render_add_expense_form(
+                error=error,
+                amount=amount,
+                category=category,
+                date_str=date_str,
+                description=description,
+            )
+
+        description_db = description if description else None
+        try:
+            insert_expense(user_id, float(amount), category, date_str, description_db)
+            return redirect(url_for("profile"))
+        except sqlite3.IntegrityError:
+            return render_add_expense_form(
+                error="An error occurred while saving the expense. Please try again.",
+                amount=amount,
+                category=category,
+                date_str=date_str,
+                description=description,
+            )
 
 
 @app.route("/expenses/<int:id>/edit")

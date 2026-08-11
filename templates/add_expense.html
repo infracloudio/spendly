@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-section">
+  <div class="auth-container">
+    <div class="auth-header">
+      <h1>Add Expense</h1>
+      <p>Record a new transaction</p>
+    </div>
+
+    <div class="auth-card">
+      {% if error %}
+        <div class="auth-error">{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('add_expense') }}">
+        <div class="form-group">
+          <label for="amount">Amount *</label>
+          <input
+            type="number"
+            id="amount"
+            name="amount"
+            step="0.01"
+            min="0.01"
+            placeholder="0.00"
+            required
+            value="{{ amount or '' }}"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="category">Category *</label>
+          <select id="category" name="category" required>
+            <option value="">Select a category</option>
+            {% for cat in categories %}
+              <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="date">Date *</label>
+          <input
+            type="date"
+            id="date"
+            name="date"
+            required
+            value="{{ date or default_date or '' }}"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="description">Description</label>
+          <input
+            type="text"
+            id="description"
+            name="description"
+            maxlength="200"
+            placeholder="Add a note (optional)"
+            value="{{ description or '' }}"
+          />
+        </div>
+
+        <button type="submit" class="btn-submit">Save Expense</button>
+      </form>
+
+      <div class="auth-footer">
+        <p>
+          <a href="{{ url_for('profile') }}">Cancel</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

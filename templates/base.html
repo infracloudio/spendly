@@ -22,6 +22,7 @@
                 {% if session.get('user_id') %}
                     <a href="{{ url_for('profile') }}" class="nav-link {% if request.endpoint == 'profile' %}active{% endif %}">Profile</a>
                     <a href="{{ url_for('analytics') }}" class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}">Analytics</a>
+                    <a href="{{ url_for('add_expense') }}" class="nav-link {% if request.endpoint == 'add_expense' %}active{% endif %}">Add Expense</a>
                     <span class="nav-divider"></span>
                     <span class="nav-username">{{ session.get('user_name', 'User') }}</span>
                     <a href="{{ url_for('logout') }}" class="nav-cta">Logout</a>

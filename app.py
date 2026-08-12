@@ -1,6 +1,6 @@
-from flask import Flask, render_template, request, redirect, url_for, session, g, flash
+from flask import Flask, render_template, request, redirect, url_for, session, g, flash, abort
 from database.db import get_db, init_db, seed_db, get_user_by_email, get_user_by_id, aggregate_expenses, get_user_expenses, get_expense_summary, email_exists, create_user
-from database.queries import insert_expense
+from database.queries import insert_expense, get_expense_by_id, update_expense
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import sqlite3
@@ -113,6 +113,28 @@ def render_add_expense_form(error=None, amount="", category="", date_str="", des
         description=description,
         default_date=datetime.now().date().isoformat(),
         categories=VALID_CATEGORIES,
+    )
+
+
+def render_edit_expense_form(expense, error=None, amount="", category="", date_str="", description=""):
+    return render_template(
+        "edit_expense.html",
+        expense=expense,
+        error=error,
+        amount=amount,
+        category=category,
+        date=date_str,
+        description=description,
+        categories=VALID_CATEGORIES,
+    )
+
+
+def read_expense_form(form):
+    return (
+        form.get("amount", "").strip(),
+        form.get("category", "").strip(),
+        form.get("date", "").strip(),
+        form.get("description", "").strip(),
     )
 
 
@@ -241,6 +263,7 @@ def profile():
     # Transform expenses into format for transactions display
     transactions_data = [
         {
+            "id": expense["id"],
             "date": expense["date"],
             "description": expense["description"] or "",
             "category": expense["category"],
@@ -303,10 +326,7 @@ def add_expense():
 
     elif request.method == "POST":
         user_id = session.get("user_id")
-        amount = request.form.get("amount", "").strip()
-        category = request.form.get("category", "").strip()
-        date_str = request.form.get("date", "").strip()
-        description = request.form.get("description", "").strip()
+        amount, category, date_str, description = read_expense_form(request.form)
 
         error = validate_expense_form(amount, category, date_str, description)
 
@@ -333,11 +353,48 @@ def add_expense():
             )
 
 
-@app.route("/expenses/<int:id>/edit")
+@app.route("/expenses/<int:id>/edit", methods=["GET", "POST"])
 def edit_expense(id):
     if not session.get("user_id"):
         return redirect(url_for("login"))
-    return "Edit expense — coming in Step 8"
+
+    user_id = session.get("user_id")
+    expense = get_expense_by_id(id, user_id)
+
+    if not expense:
+        abort(404)
+
+    if request.method == "GET":
+        return render_edit_expense_form(expense)
+
+    elif request.method == "POST":
+        amount, category, date_str, description = read_expense_form(request.form)
+
+        error = validate_expense_form(amount, category, date_str, description)
+
+        if error:
+            return render_edit_expense_form(
+                expense,
+                error=error,
+                amount=amount,
+                category=category,
+                date_str=date_str,
+                description=description,
+            )
+
+        description_db = description if description else None
+        try:
+            update_expense(id, user_id, float(amount), category, date_str, description_db)
+            return redirect(url_for("profile"))
+        except sqlite3.IntegrityError:
+            return render_edit_expense_form(
+                expense,
+                error="An error occurred while saving the expense. Please try again.",
+                amount=amount,
+                category=category,
+                date_str=date_str,
+                description=description,
+            )
 
 
 @app.route("/expenses/<int:id>/delete")

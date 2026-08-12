@@ -290,6 +290,26 @@
   min-width: 80px;
 }
 
+.actions-cell {
+  text-align: center;
+  min-width: 80px;
+}
+
+.action-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+.action-link:hover {
+  background-color: var(--accent-light);
+  color: var(--accent);
+}
+
 /* Category Badges */
 .category-badge {
   display: inline-block;

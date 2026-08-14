@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, g, flash, abort
 from database.db import get_db, init_db, seed_db, get_user_by_email, get_user_by_id, aggregate_expenses, get_user_expenses, get_expense_summary, email_exists, create_user
-from database.queries import insert_expense, get_expense_by_id, update_expense
+from database.queries import insert_expense, get_expense_by_id, update_expense, delete_expense as delete_expense_row
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import sqlite3
@@ -397,11 +397,19 @@ def edit_expense(id):
             )
 
 
-@app.route("/expenses/<int:id>/delete")
+@app.route("/expenses/<int:id>/delete", methods=["POST"])
 def delete_expense(id):
     if not session.get("user_id"):
         return redirect(url_for("login"))
-    return "Delete expense — coming in Step 9"
+
+    user_id = session.get("user_id")
+    expense = get_expense_by_id(id, user_id)
+
+    if not expense:
+        abort(404)
+
+    delete_expense_row(id, user_id)
+    return redirect(url_for("profile"))
 
 
 if __name__ == "__main__":

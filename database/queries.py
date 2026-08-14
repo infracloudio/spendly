@@ -51,3 +51,20 @@ def update_expense(expense_id, user_id, amount, category, date, description=None
     rows_affected = cursor.rowcount
     db.close()
     return rows_affected > 0
+
+
+def delete_expense(expense_id, user_id):
+    """
+    Delete an expense, scoped to both id and user_id for ownership safety.
+    Returns True if deleted, False if not found or not owned.
+    """
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        "DELETE FROM expenses WHERE id = ? AND user_id = ?",
+        (expense_id, user_id)
+    )
+    db.commit()
+    rows_affected = cursor.rowcount
+    db.close()
+    return rows_affected > 0

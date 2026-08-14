@@ -310,6 +310,25 @@
   color: var(--accent);
 }
 
+.btn-delete {
+  display: inline-block;
+  background: transparent;
+  color: var(--danger);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.btn-delete:hover {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
 /* Category Badges */
 .category-badge {
   display: inline-block;

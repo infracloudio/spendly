@@ -9,9 +9,13 @@ import math
 app = Flask(__name__)
 app.secret_key = "dev-secret-key-spendly-step3"
 
-with app.app_context():
-    init_db()
-    seed_db()
+try:
+    with app.app_context():
+        init_db()
+        seed_db()
+except Exception as e:
+    print(f"Warning: Failed to initialize database on startup: {e}")
+    pass
 
 
 # ------------------------------------------------------------------ #
